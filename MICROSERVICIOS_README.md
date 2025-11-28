@@ -148,3 +148,9 @@ curl http://localhost:8083/api/v1/prestamos
 | Roles | ✅ | ADMIN/USER |
 
 
+
+
+
+
+
+

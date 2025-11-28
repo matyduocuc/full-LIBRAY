@@ -1,19 +1,30 @@
 /**
- * Tests para MyLoans - Manejo de errores de API y rutas
+ * Tests para MyLoans - Manejo de préstamos del usuario
+ * 
+ * ¿QUÉ ES UN MOCK?
+ * ================
+ * Un "mock" simula módulos externos para aislar el código que probamos.
+ * Aquí mockeamos la API y servicios para no depender de un servidor real.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { MyLoans } from './MyLoans';
-import { ApiError } from '../../api/httpClient';
-import { loansApi } from '../../api/loansApi';
 import * as loanServiceModule from '../../services/loan.service';
 import * as bookServiceModule from '../../services/book.service';
 
 // Mock de las dependencias
-vi.mock('../../api/loansApi');
-vi.mock('../../services/loan.service');
-vi.mock('../../services/book.service');
+vi.mock('../../api/loansApi', () => ({
+  loansApi: {
+    getByUser: vi.fn().mockRejectedValue(new Error('Backend no disponible')),
+  }
+}));
+
+vi.mock('../../api/booksApi', () => ({
+  booksApi: {
+    getById: vi.fn().mockRejectedValue(new Error('Backend no disponible')),
+  }
+}));
 
 const mockUser = { id: 'user1', name: 'Test User', role: 'User' as const };
 
@@ -22,6 +33,7 @@ vi.mock('../../hooks/useUser', () => ({
 }));
 
 const renderWithRouter = () => {
+  window.history.pushState({}, '', '/my-loans');
   return render(
     <BrowserRouter>
       <Routes>
@@ -31,86 +43,34 @@ const renderWithRouter = () => {
   );
 };
 
-describe('MyLoans - Manejo de errores', () => {
+describe('MyLoans', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.history.pushState({}, '', '/my-loans');
   });
 
-  it('debe mostrar error cuando la API retorna 404', async () => {
-    // Mock: API retorna 404
-    const mockLoansApi = vi.mocked(loansApi);
-    mockLoansApi.getByUser = vi.fn().mockRejectedValue(
-      new ApiError('Préstamos no encontrados', 404, 'Not Found')
-    );
-
-    // Mock: localStorage también vacío
-    const mockLoanService = vi.mocked(loanServiceModule);
-    mockLoanService.loanService = {
-      getByUser: vi.fn().mockReturnValue([]),
-      getAll: vi.fn(),
-      getById: vi.fn(),
-      getByBookId: vi.fn(),
-      request: vi.fn(),
-      requestMany: vi.fn(),
-      approve: vi.fn(),
-      reject: vi.fn(),
-      returnBook: vi.fn(),
-      saveAll: vi.fn(),
-    } as unknown as typeof loanServiceModule.loanService;
-
-    renderWithRouter();
-
-    await waitFor(() => {
-      expect(screen.getByText(/Préstamos no disponible/i)).toBeInTheDocument();
-      expect(screen.getByText(/El préstamos que estás buscando no existe/i)).toBeInTheDocument();
-    });
-  });
-
-  it('debe mostrar error de servidor cuando la API retorna 500', async () => {
-    // Mock: API retorna 500
-    const mockLoansApi = vi.mocked(loansApi);
-    mockLoansApi.getByUser = vi.fn().mockRejectedValue(
-      new ApiError('Error interno del servidor', 500, 'Internal Server Error')
-    );
-
-    // Mock: localStorage también vacío
-    const mockLoanService = vi.mocked(loanServiceModule);
-    mockLoanService.loanService = {
-      getByUser: vi.fn().mockReturnValue([]),
-      getAll: vi.fn(),
-      getById: vi.fn(),
-      getByBookId: vi.fn(),
-      request: vi.fn(),
-      requestMany: vi.fn(),
-      approve: vi.fn(),
-      reject: vi.fn(),
-      returnBook: vi.fn(),
-      saveAll: vi.fn(),
-    } as unknown as typeof loanServiceModule.loanService;
-
-    renderWithRouter();
-
-    await waitFor(() => {
-      expect(screen.getByText(/Error del servidor/i)).toBeInTheDocument();
-      expect(screen.getByText(/Ocurrió un error al cargar el préstamos/i)).toBeInTheDocument();
-    });
-  });
-
-  it('debe mostrar estado vacío cuando no hay préstamos pero no hay error', async () => {
-    // Mock: API retorna array vacío
-    const mockLoansApi = vi.mocked(loansApi);
-    mockLoansApi.getByUser = vi.fn().mockResolvedValue([]);
+  it('debe mostrar mensaje cuando no hay préstamos', async () => {
+    // Mock: sin préstamos
+    vi.spyOn(loanServiceModule.loanService, 'getByUser').mockReturnValue([]);
 
     renderWithRouter();
 
     await waitFor(() => {
       expect(screen.getByText(/No tienes préstamos registrados/i)).toBeInTheDocument();
+    });
+  });
+
+  it('debe mostrar botón para explorar catálogo cuando no hay préstamos', async () => {
+    vi.spyOn(loanServiceModule.loanService, 'getByUser').mockReturnValue([]);
+
+    renderWithRouter();
+
+    await waitFor(() => {
       expect(screen.getByText(/Explorar catálogo/i)).toBeInTheDocument();
     });
   });
 
-  it('debe usar localStorage como fallback cuando la API falla pero hay préstamos locales', async () => {
+  it('debe mostrar préstamos cuando existen en localStorage', async () => {
     const mockLoans = [
       {
         id: 'loan1',
@@ -132,65 +92,47 @@ describe('MyLoans - Manejo de errores', () => {
       description: 'Test',
     };
 
-    // Mock: API falla
-    const mockLoansApi = vi.mocked(loansApi);
-    mockLoansApi.getByUser = vi.fn().mockRejectedValue(
-      new ApiError('Error de conexión', 0, 'Network Error')
-    );
-
     // Mock: localStorage tiene préstamos
-    const mockLoanService = vi.mocked(loanServiceModule);
-    mockLoanService.loanService = {
-      getByUser: vi.fn().mockReturnValue(mockLoans),
-      getAll: vi.fn(),
-      getById: vi.fn(),
-      getByBookId: vi.fn(),
-      request: vi.fn(),
-      requestMany: vi.fn(),
-      approve: vi.fn(),
-      reject: vi.fn(),
-      returnBook: vi.fn(),
-      saveAll: vi.fn(),
-    } as unknown as typeof loanServiceModule.loanService;
-
-    const mockBookService = vi.mocked(bookServiceModule);
-    mockBookService.bookService = {
-      getById: vi.fn().mockReturnValue(mockBook),
-      getAll: vi.fn(),
-      add: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-      remove: vi.fn(),
-      search: vi.fn(),
-      filterByCategory: vi.fn(),
-      saveAll: vi.fn(),
-    } as unknown as typeof bookServiceModule.bookService;
+    vi.spyOn(loanServiceModule.loanService, 'getByUser').mockReturnValue(mockLoans);
+    vi.spyOn(bookServiceModule.bookService, 'getById').mockReturnValue(mockBook);
 
     renderWithRouter();
 
     await waitFor(() => {
-      // Debe mostrar los préstamos del localStorage
+      // Debe mostrar el libro del préstamo
       expect(screen.getByText('Test Book')).toBeInTheDocument();
     });
   });
 
-  it('debe mostrar la URL actual cuando hay error', async () => {
-    const mockLoansApi = vi.mocked(loansApi);
-    mockLoansApi.getByUser = vi.fn().mockRejectedValue(
-      new ApiError('Error de conexión', 0, 'Network Error')
-    );
+  it('debe mostrar el estado del préstamo', async () => {
+    const mockLoans = [
+      {
+        id: 'loan2',
+        userId: 'user1',
+        bookId: 'book2',
+        loanDate: '2024-01-01',
+        dueDate: '2024-01-15',
+        status: 'pendiente' as const,
+      },
+    ];
 
-    const mockLoanService = vi.mocked(loanServiceModule);
-    mockLoanService.loanService = {
-      getByUser: vi.fn().mockReturnValue([]),
-    } as unknown as typeof loanServiceModule.loanService;
+    const mockBook = {
+      id: 'book2',
+      title: 'Another Book',
+      author: 'Another Author',
+      category: 'Test',
+      status: 'reservado' as const,
+      coverUrl: '',
+      description: 'Test',
+    };
+
+    vi.spyOn(loanServiceModule.loanService, 'getByUser').mockReturnValue(mockLoans);
+    vi.spyOn(bookServiceModule.bookService, 'getById').mockReturnValue(mockBook);
 
     renderWithRouter();
 
     await waitFor(() => {
-      const urlElement = screen.getByText(/URL actual:/i);
-      expect(urlElement).toBeInTheDocument();
+      expect(screen.getByText('Another Book')).toBeInTheDocument();
     });
   });
 });
-

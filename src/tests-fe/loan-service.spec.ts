@@ -1,15 +1,61 @@
 /**
  * Pruebas unitarias para el servicio de préstamos
  * 
- * Tests básicos para solicitar, aprobar y rechazar préstamos
+ * ¿QUÉ ES UN MOCK?
+ * ================
+ * Un "mock" simula dependencias externas para aislar el código que probamos.
+ * Aquí mockeamos la API y localStorage para no depender de servicios reales.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+/**
+ * MOCK DE loansApi
+ * ================
+ * Simula que el backend no está disponible para forzar el uso de localStorage.
+ */
+vi.mock('../api/loansApi', () => ({
+  loansApi: {
+    create: vi.fn().mockRejectedValue(new Error('Backend no disponible')),
+    getByUser: vi.fn().mockRejectedValue(new Error('Backend no disponible')),
+    getAll: vi.fn().mockRejectedValue(new Error('Backend no disponible')),
+    approve: vi.fn().mockRejectedValue(new Error('Backend no disponible')),
+    reject: vi.fn().mockRejectedValue(new Error('Backend no disponible')),
+    return: vi.fn().mockRejectedValue(new Error('Backend no disponible')),
+  }
+}));
+
+/**
+ * MOCK DE localStorage
+ * ====================
+ * Simula el almacenamiento en memoria para las pruebas.
+ */
+const mockStorage: Record<string, string> = {};
+
+vi.mock('../services/storage.service', () => ({
+  storageService: {
+    keys: { loans: 'loans', books: 'books' },
+    read: vi.fn((key: string, fallback: unknown) => {
+      const value = mockStorage[key];
+      if (!value) return fallback;
+      try {
+        return JSON.parse(value);
+      } catch {
+        return fallback;
+      }
+    }),
+    write: vi.fn((key: string, value: unknown) => {
+      mockStorage[key] = JSON.stringify(value);
+    }),
+  }
+}));
+
+// Importamos DESPUÉS de los mocks
 import { loanService } from '../services/loan.service';
 
 describe('loanService', () => {
   beforeEach(() => {
-    // Limpiar localStorage antes de cada prueba
-    localStorage.clear();
+    // Limpiar el almacenamiento mock antes de cada prueba
+    Object.keys(mockStorage).forEach(key => delete mockStorage[key]);
   });
 
   it('P1: debe crear un préstamo con estado pendiente', async () => {
@@ -85,4 +131,3 @@ describe('loanService', () => {
     expect(loans.every(l => l.status === 'pendiente')).toBe(true);
   });
 });
-
