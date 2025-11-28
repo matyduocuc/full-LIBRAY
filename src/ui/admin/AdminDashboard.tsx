@@ -1,11 +1,13 @@
 /**
- * Dashboard de Administrador - MANTENIMIENTO COMPLETO
- * Funciona 100% con localStorage
+ * Dashboard de Administrador - CONECTADO A BACKEND
+ * Carga datos en tiempo real desde microservicios
+ * Auto-refresh cada 30 segundos
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { bookService } from '../../services/book.service';
 import { userService } from '../../services/user.service';
 import { loanService } from '../../services/loan.service';
+import { reportsApi } from '../../api/reportsApi';
 
 export function AdminDashboard() {
   const [stats, setStats] = useState({
@@ -13,39 +15,96 @@ export function AdminDashboard() {
     totalUsers: 0,
     totalLoans: 0,
     availableBooks: 0,
+    activeLoans: 0,
+    pendingLoans: 0,
     loansByStatus: {} as Record<string, number>,
     recentUsers: [] as any[]
   });
+  const [loading, setLoading] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
-  useEffect(() => { loadStats(); }, []);
+  const loadStats = useCallback(async () => {
+    setLoading(true);
+    console.log('📊 Cargando estadísticas del dashboard...');
 
-  const loadStats = () => {
-    const books = bookService.getAll();
-    const users = userService.getAll();
-    const loans = loanService.getAll();
+    try {
+      // Intentar cargar del backend primero
+      const [books, users, loans] = await Promise.all([
+        bookService.getAllAsync(),
+        userService.getAllAsync(),
+        loanService.getAllAsync()
+      ]);
 
-    const loansByStatus = loans.reduce<Record<string, number>>((acc, l) => {
-      acc[l.status] = (acc[l.status] || 0) + 1;
-      return acc;
-    }, {});
+      console.log('✅ Datos cargados:', { books: books.length, users: users.length, loans: loans.length });
 
-    setStats({
-      totalBooks: books.length,
-      totalUsers: users.length,
-      totalLoans: loans.length,
-      availableBooks: books.filter(b => b.status === 'disponible').length,
-      loansByStatus,
-      recentUsers: users.slice(-5).reverse()
-    });
-  };
+      const loansByStatus = loans.reduce<Record<string, number>>((acc, l) => {
+        acc[l.status] = (acc[l.status] || 0) + 1;
+        return acc;
+      }, {});
+
+      setStats({
+        totalBooks: books.length,
+        totalUsers: users.length,
+        totalLoans: loans.length,
+        availableBooks: books.filter(b => b.status === 'disponible').length,
+        activeLoans: loans.filter(l => l.status === 'aprobado').length,
+        pendingLoans: loans.filter(l => l.status === 'pendiente').length,
+        loansByStatus,
+        recentUsers: users.slice(-5).reverse()
+      });
+
+      setLastUpdate(new Date());
+
+      // También intentar obtener estadísticas del microservicio de reportes
+      try {
+        const dashboardStats = await reportsApi.getDashboard();
+        console.log('📈 Estadísticas del backend:', dashboardStats);
+      } catch {
+        // Si el servicio de reportes no está disponible, usar datos locales
+      }
+
+    } catch (error) {
+      console.warn('⚠️ Error cargando estadísticas:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { 
+    loadStats(); 
+
+    // Auto-refresh cada 30 segundos
+    const interval = setInterval(() => {
+      console.log('🔄 Auto-refresh dashboard...');
+      loadStats();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [loadStats]);
 
   return (
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h2><i className="bi bi-speedometer2 me-2"></i>Dashboard</h2>
-        <button className="btn btn-outline-primary btn-sm" onClick={loadStats}>
-          <i className="bi bi-arrow-clockwise me-1"></i>Actualizar
-        </button>
+        <div className="d-flex align-items-center gap-3">
+          {lastUpdate && (
+            <small className="text-muted">
+              <i className="bi bi-clock me-1"></i>
+              Actualizado: {lastUpdate.toLocaleTimeString('es-CL')}
+            </small>
+          )}
+          <button 
+            className="btn btn-outline-primary btn-sm" 
+            onClick={loadStats}
+            disabled={loading}
+          >
+            {loading ? (
+              <><span className="spinner-border spinner-border-sm me-1"></span>Cargando...</>
+            ) : (
+              <><i className="bi bi-arrow-clockwise me-1"></i>Actualizar</>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Tarjetas de estadísticas */}
@@ -104,6 +163,34 @@ export function AdminDashboard() {
         </div>
       </div>
 
+      {/* Segunda fila de estadísticas */}
+      <div className="row g-3 mb-4">
+        <div className="col-md-4">
+          <div className="card border-warning h-100">
+            <div className="card-body text-center">
+              <h3 className="text-warning mb-0">{stats.pendingLoans}</h3>
+              <small className="text-muted">Préstamos Pendientes</small>
+            </div>
+          </div>
+        </div>
+        <div className="col-md-4">
+          <div className="card border-success h-100">
+            <div className="card-body text-center">
+              <h3 className="text-success mb-0">{stats.activeLoans}</h3>
+              <small className="text-muted">Préstamos Activos</small>
+            </div>
+          </div>
+        </div>
+        <div className="col-md-4">
+          <div className="card border-info h-100">
+            <div className="card-body text-center">
+              <h3 className="text-info mb-0">{stats.totalLoans - stats.activeLoans - stats.pendingLoans}</h3>
+              <small className="text-muted">Completados/Rechazados</small>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="row g-4">
         {/* Préstamos por estado */}
         <div className="col-md-6">
@@ -118,10 +205,10 @@ export function AdminDashboard() {
                 <div className="d-flex flex-wrap gap-2">
                   {Object.entries(stats.loansByStatus).map(([status, count]) => (
                     <span key={status} className={`badge ${
-                      status === 'pending' ? 'bg-warning text-dark' :
-                      status === 'approved' ? 'bg-success' :
-                      status === 'returned' ? 'bg-info' :
-                      status === 'rejected' ? 'bg-danger' : 'bg-secondary'
+                      status === 'pendiente' ? 'bg-warning text-dark' :
+                      status === 'aprobado' ? 'bg-success' :
+                      status === 'devuelto' ? 'bg-info' :
+                      status === 'rechazado' ? 'bg-danger' : 'bg-secondary'
                     }`} style={{fontSize: '1rem', padding: '8px 12px'}}>
                       {status}: {count}
                     </span>
@@ -160,6 +247,14 @@ export function AdminDashboard() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Indicador de conexión */}
+      <div className="mt-4 text-center">
+        <small className="text-muted">
+          <i className="bi bi-wifi me-1"></i>
+          Los datos se actualizan automáticamente cada 30 segundos
+        </small>
       </div>
     </div>
   );

@@ -28,3 +28,4 @@ public class Categoria {
     public void setDescripcion(String descripcion) { this.descripcion = descripcion; }
 }
 
+

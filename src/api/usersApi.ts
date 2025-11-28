@@ -1,29 +1,53 @@
 /**
- * API client para microservicio de Usuarios
- * Conectado a: http://localhost:8081/api/usuarios
+ * API client para microservicio de Usuarios (librabackend)
+ * Conectado a: http://localhost:8081/api/users
  */
 import { httpClient, ApiError } from './httpClient';
 
-export interface UsuarioDTO {
+// DTO del backend - UserResponseDTO
+export interface UserResponseDTO {
   id: number;
-  rut: string;
-  nombre: string;
-  apellido: string;
+  name: string;
   email: string;
-  telefono?: string;
-  direccion?: {
-    calle?: string;
-    numero?: string;
-    departamento?: string;
-    codigoPostal?: string;
-    comuna?: string;
-    region?: string;
-  };
-  roles: string[];
-  activo: boolean;
-  fechaCreacion?: string;
+  phone?: string;
+  role: 'USUARIO' | 'ADMINISTRADOR';
+  roleFrontend: 'Admin' | 'User'; // Campo compatible con frontend
+  status: 'ACTIVO' | 'BLOQUEADO';
+  profileImageUri?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
+// DTO del backend - LoginResponseDTO
+export interface LoginResponseDTO {
+  token: string;
+  user: UserResponseDTO;
+  expiresIn: number;
+}
+
+// DTO para login
+export interface UserLoginDTO {
+  email: string;
+  password: string;
+}
+
+// DTO para registro
+export interface UserRegistrationDTO {
+  name: string;
+  email: string;
+  password: string;
+  phone?: string;
+}
+
+// DTO para actualizar usuario
+export interface UserUpdateDTO {
+  name?: string;
+  email?: string;
+  phone?: string;
+  profileImageUri?: string;
+}
+
+// Tipos legacy para compatibilidad con el frontend existente
 export interface AuthResponse {
   token: string;
   type?: string;
@@ -39,49 +63,45 @@ export interface LoginRequest {
   password: string;
 }
 
-export interface UsuarioCreateRequest {
-  rut: string;
-  nombre: string;
-  apellido: string;
-  email: string;
-  password: string;
-  telefono?: string;
-  direccion?: {
-    calle?: string;
-    numero?: string;
-    departamento?: string;
-    codigoPostal?: string;
-    comunaNombre?: string;
-  };
-}
-
 export const usersApi = {
   /**
    * Inicia sesión
-   * Endpoint: POST /api/auth/login
+   * Endpoint: POST /api/users/login
    */
-  async login(credentials: LoginRequest): Promise<AuthResponse> {
-    // El login retorna directamente AuthResponse (no tiene formato 'ok')
-    return await httpClient.post<AuthResponse>(
+  async login(credentials: UserLoginDTO): Promise<LoginResponseDTO> {
+    return await httpClient.post<LoginResponseDTO>(
       `${httpClient.urls.auth}/login`,
       credentials
     );
   },
 
   /**
-   * Obtiene todos los usuarios (solo admin)
+   * Registra un nuevo usuario
+   * Endpoint: POST /api/users/register
    */
-  async getAll(): Promise<UsuarioDTO[]> {
-    const data = await httpClient.get<UsuarioDTO[]>(`${httpClient.urls.users}`);
+  async register(userData: UserRegistrationDTO): Promise<UserResponseDTO> {
+    return await httpClient.post<UserResponseDTO>(
+      `${httpClient.urls.users}/register`,
+      userData
+    );
+  },
+
+  /**
+   * Obtiene todos los usuarios (solo admin)
+   * Endpoint: GET /api/users
+   */
+  async getAll(): Promise<UserResponseDTO[]> {
+    const data = await httpClient.get<UserResponseDTO[]>(`${httpClient.urls.users}`);
     return Array.isArray(data) ? data : [];
   },
 
   /**
    * Obtiene un usuario por ID
+   * Endpoint: GET /api/users/{id}
    */
-  async getById(id: number): Promise<UsuarioDTO | null> {
+  async getById(id: number): Promise<UserResponseDTO | null> {
     try {
-      const data = await httpClient.get<UsuarioDTO>(`${httpClient.urls.users}/${id}`);
+      const data = await httpClient.get<UserResponseDTO>(`${httpClient.urls.users}/${id}`);
       return data || null;
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) {
@@ -92,37 +112,51 @@ export const usersApi = {
   },
 
   /**
-   * Crea un usuario
-   */
-  async create(userData: UsuarioCreateRequest): Promise<UsuarioDTO> {
-    return await httpClient.post<UsuarioDTO>(`${httpClient.urls.users}`, userData);
-  },
-
-  /**
    * Actualiza un usuario
+   * Endpoint: PUT /api/users/{id}
    */
-  async update(id: number, userData: UsuarioCreateRequest): Promise<UsuarioDTO> {
-    return await httpClient.put<UsuarioDTO>(`${httpClient.urls.users}/${id}`, userData);
+  async update(id: number, userData: UserUpdateDTO): Promise<UserResponseDTO> {
+    return await httpClient.put<UserResponseDTO>(`${httpClient.urls.users}/${id}`, userData);
   },
 
   /**
    * Elimina un usuario (solo admin)
+   * Endpoint: DELETE /api/users/{id}
    */
   async delete(id: number): Promise<void> {
     await httpClient.delete<void>(`${httpClient.urls.users}/${id}`);
   },
 
   /**
-   * Activa un usuario (solo admin)
+   * Bloquea/desbloquea un usuario (solo admin)
+   * Endpoint: PATCH /api/users/{id}/block
    */
-  async activate(id: number): Promise<void> {
-    await httpClient.patch<void>(`${httpClient.urls.users}/${id}/activar`, {});
+  async block(id: number, blocked: boolean): Promise<UserResponseDTO> {
+    return await httpClient.patch<UserResponseDTO>(
+      `${httpClient.urls.users}/${id}/block`,
+      { blocked }
+    );
   },
 
   /**
-   * Desactiva un usuario (solo admin)
+   * Cambia el rol de un usuario (solo admin)
+   * Endpoint: PATCH /api/users/{id}/role
    */
-  async deactivate(id: number): Promise<void> {
-    await httpClient.patch<void>(`${httpClient.urls.users}/${id}/desactivar`, {});
+  async changeRole(id: number, role: 'USUARIO' | 'ADMINISTRADOR'): Promise<UserResponseDTO> {
+    return await httpClient.patch<UserResponseDTO>(
+      `${httpClient.urls.users}/${id}/role`,
+      { role }
+    );
+  },
+
+  /**
+   * Valida un token JWT
+   * Endpoint: POST /api/users/validate-token
+   */
+  async validateToken(token: string): Promise<{ valid: boolean; userId?: number }> {
+    return await httpClient.post<{ valid: boolean; userId?: number }>(
+      `${httpClient.urls.users}/validate-token`,
+      { token }
+    );
   },
 };

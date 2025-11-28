@@ -77,3 +77,4 @@ public class Libro {
     public void setCategoria(Categoria categoria) { this.categoria = categoria; }
 }
 
+

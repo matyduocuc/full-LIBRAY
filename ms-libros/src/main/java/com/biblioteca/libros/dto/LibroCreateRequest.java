@@ -41,3 +41,4 @@ public class LibroCreateRequest {
     public void setCategoriaId(Long categoriaId) { this.categoriaId = categoriaId; }
 }
 
+

@@ -47,3 +47,4 @@ public class DashboardDTO {
     public void setPrestamosDevueltos(long prestamosDevueltos) { this.prestamosDevueltos = prestamosDevueltos; }
 }
 
+

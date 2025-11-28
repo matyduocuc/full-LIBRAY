@@ -19,3 +19,4 @@ public class BusquedaRequest {
     public void setDisponible(Boolean disponible) { this.disponible = disponible; }
 }
 
+

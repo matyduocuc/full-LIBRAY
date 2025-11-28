@@ -24,3 +24,4 @@ public class MultasResumenDTO {
     public void setMultasExentas(long multasExentas) { this.multasExentas = multasExentas; }
 }
 
+

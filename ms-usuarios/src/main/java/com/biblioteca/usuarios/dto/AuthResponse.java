@@ -35,3 +35,4 @@ public class AuthResponse {
     public void setRoles(List<String> roles) { this.roles = roles; }
 }
 
+

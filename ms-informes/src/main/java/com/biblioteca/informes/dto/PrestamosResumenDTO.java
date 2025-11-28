@@ -41,3 +41,4 @@ public class PrestamosResumenDTO {
     public void setMultasPagadas(long multasPagadas) { this.multasPagadas = multasPagadas; }
 }
 
+

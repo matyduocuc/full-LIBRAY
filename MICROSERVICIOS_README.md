@@ -147,3 +147,4 @@ curl http://localhost:8083/api/v1/prestamos
 | JWT Auth | ✅ | ms-usuarios |
 | Roles | ✅ | ADMIN/USER |
 
+

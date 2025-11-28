@@ -21,3 +21,4 @@ public interface PrestamoRepository extends JpaRepository<Prestamo, Long> {
     List<Prestamo> findVencidos();
 }
 
+

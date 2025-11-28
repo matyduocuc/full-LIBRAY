@@ -11,3 +11,4 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     boolean existsByRut(String rut);
 }
 
+

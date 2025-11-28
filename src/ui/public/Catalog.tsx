@@ -1,65 +1,60 @@
-import { useEffect, useMemo, useState } from 'react';
-import { booksApi } from '../../api/booksApi';
-import { ApiError } from '../../api/httpClient';
-import { mapLibroDTOArrayToBooks } from '../../utils/bookMapper';
+/**
+ * Catálogo de Libros - CONECTADO A BACKEND
+ * Carga libros desde microservicio con fallback a localStorage
+ */
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { bookService } from '../../services/book.service';
 import type { Book } from '../../domain/book';
 import { BookCard } from '../books/BookCard';
 import { useUser } from '../../hooks/useUser';
 import { cartService } from '../../services/cart.service';
-import { ResourceError } from '../shared/ResourceError';
 import { EmptyState } from '../shared/EmptyState';
 
 export function Catalog() {
   const { user } = useUser();
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<ApiError | Error | null>(null);
+  const [error, setError] = useState<Error | null>(null);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('');
   const [cartItems, setCartItems] = useState<Array<{ bookId: string; addedAt: string }>>([]);
 
-  const reload = async () => {
+  const reload = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
+      console.log('📚 Cargando catálogo...');
       
-      // Intentar primero con la API
-      const librosDTO = await booksApi.getAll();
-      // Mapear LibroDTO[] a Book[]
-      const mappedBooks = mapLibroDTOArrayToBooks(librosDTO);
-      setBooks(mappedBooks);
+      // Usar el servicio que maneja backend + fallback
+      const loadedBooks = await bookService.getAllAsync();
+      console.log('✅ Libros cargados:', loadedBooks.length);
+      setBooks(loadedBooks);
     } catch (err) {
-      // Fallback a localStorage si la API falla
-      try {
-        const localBooks = bookService.getAll();
+      console.warn('⚠️ Error cargando libros:', err);
+      // Fallback a localStorage
+      const localBooks = bookService.getAll();
+      if (localBooks.length > 0) {
         setBooks(localBooks);
-        setError(null); // No hay error si encontramos en localStorage
-      } catch {
-        setError(err instanceof ApiError ? err : new Error('Error al cargar los libros'));
+        setError(null);
+      } else {
+        setError(err instanceof Error ? err : new Error('Error al cargar los libros'));
       }
     } finally {
       setLoading(false);
       setCartItems(cartService.get());
     }
-  };
+  }, []);
 
   useEffect(() => {
     reload();
-    // Refrescar cada 500ms para detectar cambios en localStorage
+    
+    // Refrescar carrito cada 500ms
     const interval = setInterval(() => {
-      // Solo refrescar del localStorage si hay error de API
-      if (error === null && books.length === 0) {
-        const localBooks = bookService.getAll();
-        if (localBooks.length > 0) {
-          setBooks(localBooks);
-        }
-      }
       setCartItems(cartService.get());
     }, 500);
+    
     return () => clearInterval(interval);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [reload]);
 
   const categories = useMemo(() => {
     const all = Array.from(new Set(books.map(b => b.category)));
@@ -83,9 +78,19 @@ export function Catalog() {
     return result;
   }, [books, query, category]);
 
-  // Mostrar error si hay y no hay libros en localStorage
+  // Mostrar error si hay y no hay libros
   if (error && books.length === 0) {
-    return <ResourceError error={error} resourceName="libros" />;
+    return (
+      <div className="container py-4">
+        <div className="alert alert-danger">
+          <i className="bi bi-exclamation-triangle me-2"></i>
+          Error al cargar el catálogo. Por favor, recarga la página.
+        </div>
+        <button className="btn btn-primary" onClick={reload}>
+          <i className="bi bi-arrow-clockwise me-1"></i>Reintentar
+        </button>
+      </div>
+    );
   }
 
   // Mostrar loading
@@ -131,6 +136,11 @@ export function Catalog() {
                 {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
               </select>
             </div>
+            <div className="col-md-2">
+              <button className="btn btn-outline-secondary w-100" onClick={() => { setQuery(''); setCategory(''); }}>
+                <i className="bi bi-x-lg me-1"></i>Limpiar
+              </button>
+            </div>
           </div>
         </div>
         <EmptyState
@@ -145,18 +155,25 @@ export function Catalog() {
   return (
     <div>
       <div className="mb-4">
-        <h2 className="mb-3">
-          <i className="bi bi-book me-2"></i>Catálogo de Libros
-        </h2>
-        {error && (
-          <div className="alert alert-warning alert-dismissible fade show" role="alert">
-            <i className="bi bi-exclamation-triangle me-2"></i>
-            Mostrando datos del almacenamiento local. La conexión con el servidor no está disponible.
-            <button type="button" className="btn-close" onClick={() => setError(null)}></button>
-          </div>
-        )}
+        <div className="d-flex justify-content-between align-items-center mb-3">
+          <h2 className="mb-0">
+            <i className="bi bi-book me-2"></i>Catálogo de Libros
+          </h2>
+          <button 
+            className="btn btn-outline-primary btn-sm" 
+            onClick={reload}
+            disabled={loading}
+          >
+            {loading ? (
+              <span className="spinner-border spinner-border-sm"></span>
+            ) : (
+              <i className="bi bi-arrow-clockwise"></i>
+            )}
+          </button>
+        </div>
+        
         <div className="row g-3 align-items-end">
-          <div className="col-md-6">
+          <div className="col-md-5">
             <label className="form-label">
               <i className="bi bi-search me-1"></i>Buscar
             </label>
@@ -176,14 +193,25 @@ export function Catalog() {
               {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
             </select>
           </div>
-          <div className="col-md-2">
-            <div className="text-muted small">
-              <i className="bi bi-info-circle me-1"></i>
-              {filtered.length} libro{filtered.length !== 1 ? 's' : ''}
+          <div className="col-md-3">
+            <div className="d-flex justify-content-between align-items-center">
+              <span className="text-muted small">
+                <i className="bi bi-info-circle me-1"></i>
+                {filtered.length} libro{filtered.length !== 1 ? 's' : ''}
+              </span>
+              {(query || category) && (
+                <button 
+                  className="btn btn-sm btn-outline-secondary" 
+                  onClick={() => { setQuery(''); setCategory(''); }}
+                >
+                  <i className="bi bi-x-lg"></i>
+                </button>
+              )}
             </div>
           </div>
         </div>
       </div>
+      
       <div className="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-3">
         {filtered.map(b => (
           <div className="col" key={b.id}>
@@ -199,11 +227,3 @@ export function Catalog() {
     </div>
   );
 }
-
-/*
-Explicación:
-- El refresco automático mediante intervalo de 500ms detecta cambios en localStorage sin recargar la página.
-- Esto permite que los libros creados desde Admin aparezcan inmediatamente en el catálogo público.
-- El filtrado se hace en memoria sobre el estado local para mantener consistencia y rendimiento.
-- La búsqueda y filtrado por categoría funcionan de forma reactiva gracias a useMemo.
-*/

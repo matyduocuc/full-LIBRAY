@@ -100,6 +100,82 @@ describe('bookService', () => {
     const result = bookService.delete('non-existent-id');
     expect(result).toBe(false);
   });
+
+  it('L1: debe buscar libros por título', async () => {
+    // Agregar libros de prueba
+    await bookService.add({
+      title: 'JavaScript Guide',
+      author: 'JS Author',
+      category: 'Programación',
+      description: 'Una guía completa de JavaScript para desarrolladores',
+      coverUrl: 'https://example.com/js.jpg',
+      status: 'disponible'
+    });
+    await bookService.add({
+      title: 'Python Basics',
+      author: 'Python Author',
+      category: 'Programación',
+      description: 'Introducción básica al lenguaje Python',
+      coverUrl: 'https://example.com/python.jpg',
+      status: 'disponible'
+    });
+    
+    // Buscar por título
+    const results = bookService.search('JavaScript');
+    
+    expect(results.length).toBe(1);
+    expect(results[0].title).toContain('JavaScript');
+  });
+
+  it('L2: debe filtrar libros por categoría', async () => {
+    // Agregar libros de diferentes categorías
+    await bookService.add({
+      title: 'Programming Book',
+      author: 'Author 1',
+      category: 'Programación',
+      description: 'Un libro sobre programación muy interesante',
+      coverUrl: 'https://example.com/prog.jpg',
+      status: 'disponible'
+    });
+    await bookService.add({
+      title: 'History Book',
+      author: 'Author 2',
+      category: 'Historia',
+      description: 'Un libro sobre historia mundial muy completo',
+      coverUrl: 'https://example.com/history.jpg',
+      status: 'disponible'
+    });
+    
+    // Filtrar por categoría
+    const results = bookService.filterByCategory('Programación');
+    
+    expect(results.length).toBe(1);
+    expect(results[0].category).toBe('Programación');
+  });
+
+  it('L3: debe buscar libros por autor', () => {
+    bookService.add({
+      title: 'Clean Code',
+      author: 'Robert Martin',
+      category: 'Programación',
+      description: 'Principios y patrones de código limpio para programadores',
+      coverUrl: 'https://example.com/clean.jpg',
+      status: 'disponible'
+    });
+    bookService.add({
+      title: 'Design Patterns',
+      author: 'Gang of Four',
+      category: 'Programación',
+      description: 'Patrones de diseño de software explicados con ejemplos',
+      coverUrl: 'https://example.com/patterns.jpg',
+      status: 'disponible'
+    });
+    
+    const results = bookService.search('Robert');
+    
+    expect(results.length).toBe(1);
+    expect(results[0].author).toContain('Robert');
+  });
 });
 
 

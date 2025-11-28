@@ -36,3 +36,4 @@ public class UsuarioResumenDTO {
     public void setMultasPendientes(long multasPendientes) { this.multasPendientes = multasPendientes; }
 }
 
+

@@ -8,12 +8,13 @@
  * - Informes: puerto 8085
  */
 
-// URLs de los microservicios principales (puedes cambiarlas en un archivo .env si necesitas)
-const BOOKS_API_URL = import.meta.env.VITE_BOOKS_API_URL || 'http://localhost:8082/api/libros';
-const USERS_API_URL = import.meta.env.VITE_USERS_API_URL || 'http://localhost:8081/api/usuarios';
-const AUTH_API_URL = import.meta.env.VITE_AUTH_API_URL || 'http://localhost:8081/api/auth';
-const LOANS_API_URL = import.meta.env.VITE_LOANS_API_URL || 'http://localhost:8083/api/v1/prestamos';
-const REPORTS_API_URL = import.meta.env.VITE_REPORTS_API_URL || 'http://localhost:8085/api/informes';
+// URLs de los microservicios principales - librabackend
+// Puertos: Users=8081, Books=8082, Loans=8083, Reports=8084, Notifications=8085
+const BOOKS_API_URL = import.meta.env.VITE_BOOKS_API_URL || 'http://localhost:8082/api/books';
+const USERS_API_URL = import.meta.env.VITE_USERS_API_URL || 'http://localhost:8081/api/users';
+const AUTH_API_URL = import.meta.env.VITE_AUTH_API_URL || 'http://localhost:8081/api/users'; // Login está en /api/users
+const LOANS_API_URL = import.meta.env.VITE_LOANS_API_URL || 'http://localhost:8083/api/loans';
+const REPORTS_API_URL = import.meta.env.VITE_REPORTS_API_URL || 'http://localhost:8084/api/reports';
 
 // URLs opcionales (no usadas en los 4 microservicios principales)
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';

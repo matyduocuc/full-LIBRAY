@@ -1,4 +1,8 @@
-import { useEffect, useState } from 'react';
+/**
+ * Gestión de Libros - CONECTADO A BACKEND
+ * Carga datos en tiempo real desde microservicios
+ */
+import { useEffect, useState, useCallback } from 'react';
 import { bookService } from '../../services/book.service';
 import type { Book } from '../../domain/book';
 import { resolveCover, FALLBACK_COVER, withCacheBuster } from '../shared/getCover';
@@ -20,9 +24,24 @@ export function BooksAdmin() {
   const [form, setForm] = useState<Omit<Book, 'id'>>({ ...empty });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const reload = () => setBooks(bookService.getAll());
-  useEffect(() => { reload(); }, []);
+  const reload = useCallback(async () => {
+    setLoading(true);
+    console.log('📚 Cargando libros...');
+    try {
+      const data = await bookService.getAllAsync();
+      setBooks(data);
+      console.log('✅ Libros cargados:', data.length);
+    } catch (error) {
+      console.warn('⚠️ Error cargando libros:', error);
+      setBooks(bookService.getAll());
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { reload(); }, [reload]);
 
   const validateForm = (): boolean => {
     return (
@@ -35,13 +54,14 @@ export function BooksAdmin() {
     );
   };
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) {
       alert('Por favor completa todos los campos requeridos correctamente.');
       return;
     }
 
+    setLoading(true);
     const bookData = {
       ...form,
       coverUrl: form.coverUrl.trim(),
@@ -49,19 +69,27 @@ export function BooksAdmin() {
       status: editingId ? form.status : 'disponible' as const
     };
 
-    if (editingId) {
-      bookService.update(editingId, bookData);
-      setSuccessMessage('Libro actualizado correctamente.');
-    } else {
-      bookService.add(bookData);
-      setSuccessMessage('Libro creado correctamente.');
+    try {
+      if (editingId) {
+        await bookService.update(editingId, bookData);
+        setSuccessMessage('✅ Libro actualizado correctamente (guardado en backend).');
+        console.log('✅ Libro actualizado');
+      } else {
+        await bookService.add(bookData);
+        setSuccessMessage('✅ Libro creado correctamente (guardado en backend).');
+        console.log('✅ Libro creado');
+      }
+      
+      setForm({ ...empty });
+      setEditingId(null);
+      await reload();
+    } catch (error) {
+      console.error('Error guardando libro:', error);
+      setSuccessMessage('⚠️ Error al guardar. Datos guardados localmente.');
+    } finally {
+      setLoading(false);
+      setTimeout(() => setSuccessMessage(null), 4000);
     }
-    
-    setForm({ ...empty });
-    setEditingId(null);
-    reload();
-    
-    setTimeout(() => setSuccessMessage(null), 3000);
   };
 
   const edit = (b: Book) => {
@@ -77,7 +105,31 @@ export function BooksAdmin() {
     });
   };
 
-  const remove = (id: string) => { bookService.remove(id); reload(); };
+  const remove = async (id: string) => {
+    setLoading(true);
+    try {
+      await bookService.delete(id);
+      console.log('✅ Libro eliminado');
+      await reload();
+    } catch (error) {
+      console.error('Error eliminando libro:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateStatus = async (id: string, status: Book['status']) => {
+    setLoading(true);
+    try {
+      await bookService.update(id, { status });
+      console.log('✅ Estado actualizado');
+      await reload();
+    } catch (error) {
+      console.error('Error actualizando estado:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="row g-4">
@@ -86,7 +138,20 @@ export function BooksAdmin() {
           <h3>
             <i className="bi bi-book me-2"></i>Gestión de Libros
           </h3>
-          <span className="badge bg-secondary">{books.length} libro{books.length !== 1 ? 's' : ''}</span>
+          <div className="d-flex gap-2 align-items-center">
+            <span className="badge bg-secondary">{books.length} libro{books.length !== 1 ? 's' : ''}</span>
+            <button 
+              className="btn btn-outline-primary btn-sm" 
+              onClick={reload}
+              disabled={loading}
+            >
+              {loading ? (
+                <span className="spinner-border spinner-border-sm"></span>
+              ) : (
+                <i className="bi bi-arrow-clockwise"></i>
+              )}
+            </button>
+          </div>
         </div>
         <div className="table-responsive">
           <table className="table table-hover align-middle shadow-sm">
@@ -110,10 +175,8 @@ export function BooksAdmin() {
                   <select 
                     className={`form-select form-select-sm ${b.status === 'disponible' ? 'border-success' : 'border-secondary'}`}
                     value={b.status} 
-                    onChange={(e)=>{
-                      bookService.update(b.id,{ status: e.target.value as Book['status']}); 
-                      reload();
-                    }}
+                    onChange={(e) => updateStatus(b.id, e.target.value as Book['status'])}
+                    disabled={loading}
                   >
                     <option value="disponible">Disponible</option>
                     <option value="prestado">Prestado</option>
@@ -122,19 +185,21 @@ export function BooksAdmin() {
                 <td className="text-end">
                   <button 
                     className="btn btn-sm btn-outline-primary me-2" 
-                    onClick={()=>edit(b)}
+                    onClick={() => edit(b)}
                     title="Editar libro"
+                    disabled={loading}
                   >
                     <i className="bi bi-pencil"></i>
                   </button>
                   <button 
                     className="btn btn-sm btn-outline-danger" 
-                    onClick={()=>{
+                    onClick={() => {
                       if (confirm(`¿Estás seguro de eliminar "${b.title}"?`)) {
                         remove(b.id);
                       }
                     }}
                     title="Eliminar libro"
+                    disabled={loading}
                   >
                     <i className="bi bi-trash"></i>
                   </button>
@@ -155,8 +220,7 @@ export function BooksAdmin() {
           </div>
           <div className="card-body">
             {successMessage && (
-              <div className="alert alert-success alert-dismissible fade show" role="alert">
-                <i className="bi bi-check-circle me-2"></i>
+              <div className={`alert ${successMessage.includes('Error') ? 'alert-warning' : 'alert-success'} alert-dismissible fade show`} role="alert">
                 {successMessage}
                 <button type="button" className="btn-close" onClick={() => setSuccessMessage(null)}></button>
               </div>
@@ -167,9 +231,10 @@ export function BooksAdmin() {
                 <input 
                   className="form-control" 
                   value={form.title} 
-                  onChange={e=>setForm(f=>({...f, title:e.target.value}))} 
+                  onChange={e => setForm(f => ({...f, title: e.target.value}))} 
                   required 
                   minLength={2}
+                  disabled={loading}
                 />
               </div>
               <div className="mb-2">
@@ -177,9 +242,10 @@ export function BooksAdmin() {
                 <input 
                   className="form-control" 
                   value={form.author} 
-                  onChange={e=>setForm(f=>({...f, author:e.target.value}))} 
+                  onChange={e => setForm(f => ({...f, author: e.target.value}))} 
                   required 
                   minLength={2}
+                  disabled={loading}
                 />
               </div>
               <div className="mb-2">
@@ -187,8 +253,9 @@ export function BooksAdmin() {
                 <select 
                   className="form-select" 
                   value={form.category} 
-                  onChange={e=>setForm(f=>({...f, category:e.target.value}))} 
+                  onChange={e => setForm(f => ({...f, category: e.target.value}))} 
                   required
+                  disabled={loading}
                 >
                   <option value="">Selecciona una categoría</option>
                   {categories.map(cat => (
@@ -204,12 +271,13 @@ export function BooksAdmin() {
                 <textarea 
                   className={`form-control ${form.description.trim().length > 0 && (form.description.trim().length < 30 || form.description.trim().length > 280) ? 'is-invalid' : ''}`}
                   value={form.description} 
-                  onChange={e=>setForm(f=>({...f, description:e.target.value}))} 
+                  onChange={e => setForm(f => ({...f, description: e.target.value}))} 
                   required 
                   minLength={30}
                   maxLength={280}
                   rows={4}
                   placeholder="Describe el libro (30-280 caracteres)"
+                  disabled={loading}
                 />
                 {form.description.trim().length > 0 && form.description.trim().length < 30 && (
                   <div className="invalid-feedback">Mínimo 30 caracteres</div>
@@ -224,9 +292,10 @@ export function BooksAdmin() {
                   type="text"
                   className="form-control"
                   value={form.coverUrl} 
-                  onChange={e=>setForm(f=>({...f, coverUrl:e.target.value}))} 
+                  onChange={e => setForm(f => ({...f, coverUrl: e.target.value}))} 
                   required 
                   placeholder="/img/books/nombre-archivo.jpg o https://..."
+                  disabled={loading}
                 />
                 <small className="text-muted">Usa ruta local (/img/books/...) o URL completa</small>
               </div>
@@ -257,14 +326,20 @@ export function BooksAdmin() {
                   type="url"
                   className="form-control"
                   value={form.bannerUrl || ''} 
-                  onChange={e=>setForm(f=>({...f, bannerUrl:e.target.value}))} 
+                  onChange={e => setForm(f => ({...f, bannerUrl: e.target.value}))} 
                   placeholder="https://ejemplo.com/banner.jpg"
+                  disabled={loading}
                 />
               </div>
               {editingId && (
                 <div className="mb-3">
                   <label className="form-label">Estado</label>
-                  <select className="form-select" value={form.status} onChange={e=>setForm(f=>({...f, status:e.target.value as Book['status']}))}>
+                  <select 
+                    className="form-select" 
+                    value={form.status} 
+                    onChange={e => setForm(f => ({...f, status: e.target.value as Book['status']}))}
+                    disabled={loading}
+                  >
                     <option value="disponible">disponible</option>
                     <option value="prestado">prestado</option>
                   </select>
@@ -274,20 +349,25 @@ export function BooksAdmin() {
                 <button 
                   className="btn btn-primary" 
                   type="submit"
-                  disabled={!validateForm()}
+                  disabled={!validateForm() || loading}
                 >
-                  <i className={`bi ${editingId ? 'bi-check-lg' : 'bi-plus-lg'} me-2`}></i>
-                  {editingId ? 'Guardar cambios' : 'Crear libro'}
+                  {loading ? (
+                    <><span className="spinner-border spinner-border-sm me-2"></span>Guardando...</>
+                  ) : (
+                    <><i className={`bi ${editingId ? 'bi-check-lg' : 'bi-plus-lg'} me-2`}></i>
+                    {editingId ? 'Guardar cambios' : 'Crear libro'}</>
+                  )}
                 </button>
                 {editingId && (
                   <button 
                     className="btn btn-outline-secondary" 
                     type="button" 
-                    onClick={()=>{
+                    onClick={() => {
                       setEditingId(null); 
                       setForm({...empty});
                       setSuccessMessage(null);
                     }}
+                    disabled={loading}
                   >
                     <i className="bi bi-x-lg me-2"></i>Cancelar
                   </button>
@@ -300,16 +380,3 @@ export function BooksAdmin() {
     </div>
   );
 }
-
-/*
-Explicación:
-- Los campos nuevos (description, coverUrl, bannerUrl) enriquecen la ficha del libro y evitan tener que meter imágenes "a mano" en código.
-- El refresco local mediante reload() mantiene la app reactiva sin recargar la página.
-- El servicio centralizado (bookService) garantiza que el catálogo público vea el nuevo libro inmediatamente.
-- Las validaciones suaves mejoran la UX: el botón se deshabilita si hay errores y muestra feedback visual.
-- La previsualización de imagen permite verificar que la URL funciona antes de guardar.
-- El contador de caracteres en description ayuda al usuario a cumplir los límites.
-- El estado se bloquea en 'disponible' al crear para mantener consistencia de negocio.
-*/
-
-
