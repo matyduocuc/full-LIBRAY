@@ -1,0 +1,94 @@
+Documentación de API - SISTEMA DE BIBLIOTECA,,,,,,,,
+,,,,,,,,
+Versión 1.0,,,,,,,,
+Fecha: 28/11/2024,,,,,,,,
+,,,,,,,,
+URL USER SERVICE,http://localhost:8081/api,,,,,,,
+URL BOOK SERVICE,http://localhost:8082/api,,,,,,,
+URL LOAN SERVICE,http://localhost:8083/api,,,,,,,
+URL REPORTS SERVICE,http://localhost:8084/api,,,,,,,
+,,,,,,,,
+URL SWAGGER USER,http://localhost:8081/swagger-ui.html,,,,,,,
+URL SWAGGER BOOKS,http://localhost:8082/swagger-ui.html,,,,,,,
+URL SWAGGER LOANS,http://localhost:8083/swagger-ui.html,,,,,,,
+URL SWAGGER REPORTS,http://localhost:8084/swagger-ui.html,,,,,,,
+,,,,,,,,
+,,,,,,,,
+=== USER MANAGEMENT SERVICE (Puerto 8081) ===,,,,,,,,
+,,,,,,,,
+Método HTTP,Ruta del Endpoint,Descripción,Datos de entrada,Respuestas,API Pública/Privada,Requiere Autenticación,Roles,Observaciones
+POST,/api/users/login,Inicia sesión de usuario,"{""email"": ""admin@test.com"", ""password"": ""admin123""}","200: Éxito (token + user), 401: Credenciales incorrectas, 500: Error servidor",Pública,No,N/A,Devuelve token JWT válido por 24 horas
+POST,/api/users/register,Registra nuevo usuario,"{""name"": ""Juan"", ""email"": ""juan@test.com"", ""password"": ""123456""}","201: Usuario creado, 400: Email duplicado, 500: Error servidor",Pública,No,N/A,Usuario se crea con rol USUARIO por defecto
+POST,/api/users/validate-token,Valida token JWT,"{""token"": ""eyJhbG...""}","200: Token válido, 401: Token inválido",Pública,No,N/A,Verifica si el token no ha expirado
+GET,/api/users,Lista todos los usuarios,N/A,"200: Lista usuarios, 401: No autorizado, 403: Sin permisos",Privada,Sí,Admin,Solo administradores pueden ver todos los usuarios
+GET,/api/users/{id},Obtiene usuario por ID,N/A,"200: Usuario encontrado, 404: No encontrado",Privada,Sí,Admin/User,Usuario solo puede ver su propio perfil
+PUT,/api/users/{id},Actualiza datos de usuario,"{""name"": ""Nuevo nombre"", ""email"": ""nuevo@email.com""}","200: Actualizado, 400: Datos inválidos, 404: No encontrado",Privada,Sí,Admin/User,Admin puede editar cualquiera; User solo su perfil
+DELETE,/api/users/{id},Elimina un usuario,N/A,"204: Eliminado, 404: No encontrado, 403: Sin permisos",Privada,Sí,Admin,Solo administradores pueden eliminar usuarios
+PATCH,/api/users/{id}/block,Bloquea/desbloquea usuario,"{""blocked"": true}","200: Estado cambiado, 404: No encontrado",Privada,Sí,Admin,Cambia status entre ACTIVO y BLOQUEADO
+,,,,,,,,
+,,,,,,,,
+=== BOOK CATALOG SERVICE (Puerto 8082) ===,,,,,,,,
+,,,,,,,,
+Método HTTP,Ruta del Endpoint,Descripción,Datos de entrada,Respuestas,API Pública/Privada,Requiere Autenticación,Roles,Observaciones
+GET,/api/books,Lista todos los libros,N/A,"200: Lista de libros, 500: Error servidor",Pública,No,N/A,Retorna catálogo completo de libros
+GET,/api/books/{id},Obtiene libro por ID,N/A,"200: Libro encontrado, 404: No encontrado",Pública,No,N/A,Incluye información detallada del libro
+GET,/api/books/search?q={texto},Busca libros por título o autor,Query param: q=texto,"200: Resultados, 200: Array vacío si no hay",Pública,No,N/A,Búsqueda case-insensitive por título y autor
+GET,/api/books/category/{cat},Filtra libros por categoría,Path param: categoría,"200: Libros de la categoría",Pública,No,N/A,Categorías: Programación; Historia; Ciencia; etc.
+POST,/api/books,Crea un nuevo libro,"{""title"": ""Clean Code"", ""author"": ""Robert Martin"", ""isbn"": ""978-0132350884"", ""category"": ""Programación"", ""totalCopies"": 5}","201: Libro creado, 400: Datos inválidos, 409: ISBN duplicado",Privada,Sí,Admin,Solo administradores pueden agregar libros
+PUT,/api/books/{id},Actualiza información del libro,"{""title"": ""Nuevo título"", ""description"": ""Nueva descripción""}","200: Actualizado, 400: Datos inválidos, 404: No encontrado",Privada,Sí,Admin,Permite actualización parcial de campos
+DELETE,/api/books/{id},Elimina un libro,N/A,"204: Eliminado, 404: No encontrado, 400: Tiene préstamos activos",Privada,Sí,Admin,No se puede eliminar si tiene préstamos activos
+POST,/api/books/seed,Carga libros de prueba,N/A,"200: Libros cargados, 403: Sin permisos",Privada,Sí,Admin,Carga datos iniciales para pruebas
+,,,,,,,,
+,,,,,,,,
+=== LOAN MANAGEMENT SERVICE (Puerto 8083) ===,,,,,,,,
+,,,,,,,,
+Método HTTP,Ruta del Endpoint,Descripción,Datos de entrada,Respuestas,API Pública/Privada,Requiere Autenticación,Roles,Observaciones
+GET,/api/loans,Lista todos los préstamos,N/A,"200: Lista préstamos, 403: Sin permisos",Privada,Sí,Admin,Solo administradores ven todos los préstamos
+GET,/api/loans/{id},Obtiene préstamo por ID,N/A,"200: Préstamo encontrado, 404: No encontrado",Privada,Sí,Admin/User,Usuario solo puede ver sus propios préstamos
+GET,/api/loans/user/{userId},Préstamos de un usuario,Path param: userId,"200: Lista préstamos del usuario",Privada,Sí,Admin/User,Usuario solo puede consultar sus préstamos
+GET,/api/loans/pending,Lista préstamos pendientes,N/A,"200: Préstamos pendientes de aprobación",Privada,Sí,Admin,Para panel de administración
+POST,/api/loans,Solicita un préstamo,"{""userId"": 1, ""bookId"": 1}","201: Préstamo creado (status: PENDIENTE), 400: Libro no disponible, 404: Usuario/Libro no encontrado",Privada,Sí,Admin/User,Crea préstamo con estado PENDIENTE
+PATCH,/api/loans/{id}/approve,Aprueba un préstamo,N/A,"200: Préstamo aprobado, 404: No encontrado, 400: Ya procesado",Privada,Sí,Admin,Cambia status de PENDIENTE a APROBADO
+PATCH,/api/loans/{id}/reject,Rechaza un préstamo,N/A,"200: Préstamo rechazado, 404: No encontrado, 400: Ya procesado",Privada,Sí,Admin,Cambia status de PENDIENTE a RECHAZADO
+PATCH,/api/loans/{id}/return,Registra devolución,N/A,"200: Libro devuelto, 404: No encontrado, 400: No estaba prestado",Privada,Sí,Admin/User,Cambia status a DEVUELTO y registra returnDate
+,,,,,,,,
+,,,,,,,,
+=== REPORTS SERVICE (Puerto 8084) ===,,,,,,,,
+,,,,,,,,
+Método HTTP,Ruta del Endpoint,Descripción,Datos de entrada,Respuestas,API Pública/Privada,Requiere Autenticación,Roles,Observaciones
+GET,/api/reports/dashboard,Dashboard con estadísticas,N/A,"200: {totalUsers, totalBooks, totalLoans, activeLoans, pendingLoans}",Privada,Sí,Admin,Estadísticas generales del sistema
+GET,/api/reports/loans,Reporte de préstamos,Query params: ?startDate=&endDate=,"200: Lista detallada de préstamos",Privada,Sí,Admin,Permite filtrar por rango de fechas
+GET,/api/reports/books/popular,Libros más solicitados,N/A,"200: Top 10 libros más prestados",Privada,Sí,Admin,Ordenados por cantidad de préstamos
+GET,/api/reports/users/active,Usuarios más activos,N/A,"200: Top usuarios con más préstamos",Privada,Sí,Admin,Para análisis de uso del sistema
+GET,/api/reports/overdue,Préstamos vencidos,N/A,"200: Lista de préstamos con fecha vencida",Privada,Sí,Admin,Préstamos que superaron dueDate sin devolver
+,,,,,,,,
+,,,,,,,,
+=== RESUMEN DE AUTENTICACIÓN ===,,,,,,,,
+,,,,,,,,
+Tipo,Descripción,,,,,,,
+JWT Token,Se envía en header: Authorization: Bearer {token},,,,,,,
+Expiración,24 horas (86400 segundos),,,,,,,
+Algoritmo,HS256,,,,,,,
+,,,,,,,,
+,,,,,,,,
+=== CÓDIGOS DE RESPUESTA HTTP ===,,,,,,,,
+,,,,,,,,
+Código,Significado,Cuándo se usa,,,,,,
+200,OK,Petición exitosa (GET; PUT; PATCH),,,,,,
+201,Created,Recurso creado exitosamente (POST),,,,,,
+204,No Content,Eliminación exitosa (DELETE),,,,,,
+400,Bad Request,Datos de entrada inválidos,,,,,,
+401,Unauthorized,Token no enviado o inválido,,,,,,
+403,Forbidden,Sin permisos para la acción,,,,,,
+404,Not Found,Recurso no encontrado,,,,,,
+409,Conflict,Conflicto (ej: email duplicado),,,,,,
+500,Internal Server Error,Error del servidor,,,,,,
+
+
+
+
+
+
+
+
+

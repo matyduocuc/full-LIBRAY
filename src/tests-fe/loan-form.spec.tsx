@@ -16,23 +16,23 @@ import type { User } from '../domain/user';
 import type { LegacyLoan } from '../domain/loan';
 
 // Datos mock para las pruebas
-const mockBook: Book = {
-  id: '1',
-  title: 'Clean Code',
-  author: 'Robert C. Martin',
-  category: 'Dev',
-  description: 'A book about clean code',
-  coverUrl: 'https://example.com/clean-code.jpg',
+  const mockBook: Book = {
+    id: '1',
+    title: 'Clean Code',
+    author: 'Robert C. Martin',
+    category: 'Dev',
+    description: 'A book about clean code',
+    coverUrl: 'https://example.com/clean-code.jpg',
   status: 'disponible' // Importante: debe estar disponible
-};
+  };
 
-const mockUser: User = {
-  id: '1',
-  name: 'Juan Pérez',
-  email: 'juan@example.com',
-  role: 'User',
-  passwordHash: 'hash123'
-};
+  const mockUser: User = {
+    id: '1',
+    name: 'Juan Pérez',
+    email: 'juan@example.com',
+    role: 'User',
+    passwordHash: 'hash123'
+  };
 
 const mockLoan: LegacyLoan = {
   id: 'loan1',
@@ -42,7 +42,7 @@ const mockLoan: LegacyLoan = {
   dueDate: new Date().toISOString(),
   status: 'pendiente'
 };
-
+    
 // Mock de los servicios
 vi.mock('../services/book.service', () => ({
   bookService: {
@@ -155,7 +155,7 @@ describe('LoanForm', () => {
     
     // El componente muestra "Préstamo solicitado exitosamente. Espera aprobación del administrador."
     await waitFor(() => {
-      expect(screen.getByText(/Préstamo solicitado exitosamente/i)).toBeInTheDocument();
+    expect(screen.getByText(/Préstamo solicitado exitosamente/i)).toBeInTheDocument();
     });
   });
 });

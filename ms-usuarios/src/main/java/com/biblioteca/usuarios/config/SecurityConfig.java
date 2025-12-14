@@ -41,9 +41,19 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
+                // Rutas públicas de autenticación
                 .requestMatchers("/api/auth/**").permitAll()
-                .requestMatchers("/swagger-ui/**", "/api-docs/**", "/v3/api-docs/**").permitAll()
+                .requestMatchers("/api/users/login", "/api/users/register").permitAll()
+                // Rutas de Swagger - TODAS permitidas
+                .requestMatchers("/swagger-ui.html").permitAll()
+                .requestMatchers("/swagger-ui/**").permitAll()
+                .requestMatchers("/v3/api-docs/**").permitAll()
+                .requestMatchers("/api-docs/**").permitAll()
+                .requestMatchers("/swagger-resources/**").permitAll()
+                .requestMatchers("/webjars/**").permitAll()
+                // Consola H2
                 .requestMatchers("/h2-console/**").permitAll()
+                // Rutas de admin
                 .requestMatchers("/api/usuarios/**").hasRole("Admin")
                 .anyRequest().authenticated())
             .headers(h -> h.frameOptions(f -> f.sameOrigin()))

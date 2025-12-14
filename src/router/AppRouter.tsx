@@ -39,6 +39,7 @@ import { AdminDashboard } from '../ui/admin/AdminDashboard';
 import { BooksAdmin } from '../ui/admin/BooksAdmin';
 import { UsersAdmin } from '../ui/admin/UsersAdmin';
 import { LoansAdmin } from '../ui/admin/LoansAdmin';
+import { StockAdmin } from '../ui/admin/StockAdmin';
 import { NotFoundPage } from '../ui/shared/NotFoundPage';
 import { useUser } from '../hooks/useUser';
 
@@ -88,6 +89,7 @@ export function AppRouter() {
           <Route path="books" element={<BooksAdmin />} />
           <Route path="users" element={<UsersAdmin />} />
           <Route path="loans" element={<LoansAdmin />} />
+          <Route path="stock" element={<StockAdmin />} />
         </Route>
 
         <Route path="*" element={<NotFoundPage />} />

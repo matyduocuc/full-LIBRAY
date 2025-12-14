@@ -50,6 +50,11 @@ export function AdminNavbar() {
                 <i className="bi bi-journal-text me-1"></i>Préstamos
               </NavLink>
             </li>
+            <li className="nav-item">
+              <NavLink className="nav-link" to="/admin/stock">
+                <i className="bi bi-box-seam me-1"></i>Stock
+              </NavLink>
+            </li>
           </ul>
           <ul className="navbar-nav ms-auto">
             {user && (
